@@ -8,7 +8,10 @@ Hoy incluye el servicio de **noticias**, de solo lectura: las noticias se cargan
 ## Arquitectura
 
 ```
-Apps cliente ──HTTPS──▶ Nginx (TLS, gzip, límite por IP)
+Apps cliente ──HTTPS──▶ Cloudflare (proxy, TLS público)
+                          │ HTTPS con el certificado de origen
+                          ▼
+                        Nginx (gzip, límite por IP real del cliente)
                           │ 127.0.0.1:8053
                           ▼
                  Uvicorn (4 workers, systemd) ── FastAPI
@@ -83,7 +86,7 @@ la excepción: siempre devuelve las 10 noticias más recientes, ordenadas por
 `fecha_publicacion` descendente, sin paginación ni filtros.
 
 ```bash
-curl -H "X-API-Key: $KEY" "https://hierro.ejemplo.com/noticias/v1/lista"
+curl -H "X-API-Key: $KEY" "https://servicio.semanticaapi.com.co/noticias/v1/lista"
 ```
 
 ## Desarrollo local
@@ -220,7 +223,7 @@ caché.
 
 El servidor se prepara una sola vez siguiendo
 [`deploy/APROVISIONAMIENTO.md`](deploy/APROVISIONAMIENTO.md) (Ubuntu 24.04: usuario del
-servicio, Redis administrado, Nginx, Certbot y systemd).
+servicio, Redis administrado, Nginx con el certificado de origen de Cloudflare y systemd).
 
 Cada despliegue es manual:
 

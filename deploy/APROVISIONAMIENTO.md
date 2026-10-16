@@ -1,14 +1,15 @@
 # Aprovisionamiento del servidor (Ubuntu 24.04)
 
 Pasos para preparar un servidor nuevo, una sola vez. Los comandos se ejecutan como
-un usuario con `sudo`. Reemplaza `hierro.ejemplo.com` por tu dominio.
+un usuario con `sudo`. El dominio es `servicio.semanticaapi.com.co` y pasa por el proxy
+de Cloudflare.
 
 ## 1. Paquetes del sistema
 
 ```bash
 sudo apt update && sudo apt upgrade -y
 sudo apt install -y git curl python3.12 python3.12-venv nginx redis-tools \
-    certbot postgresql-client
+    postgresql-client
 ```
 
 `postgresql-client` aporta `psql`, que se usa para ejecutar `scripts/roles.sql`.
@@ -112,8 +113,7 @@ La URL del rol propietario va en un archivo aparte, `/opt/hierro/.env.admin`, qu
 puede leer root. El proceso de la API nunca la ve:
 
 ```bash
-echo 'ADMIN_DATABASE_URL=postgresql+asyncpg://owner_noticias:CONTRASEÑA@HOST:25060/BASE' \
-    | sudo tee /opt/hierro/.env.admin >/dev/null
+echo 'ADMIN_DATABASE_URL=postgresql+asyncpg://owner_noticias:CONTRASEÑA@HOST:25060/BASE' | sudo tee /opt/hierro/.env.admin >/dev/null
 sudo chmod 0600 /opt/hierro/.env.admin
 ```
 
@@ -139,43 +139,64 @@ psql "postgresql://doadmin@HOST:25060/BASE?sslmode=require" \
 ## 8. systemd
 
 ```bash
-sudo cp deploy/hierro.service /etc/systemd/system/
+sudo cp deploy/hierro.service /etc/systemd/system/ -- ESTE REVISO EL DE JARDIN
 sudo systemctl daemon-reload
 sudo systemctl enable --now hierro
 curl -s http://127.0.0.1:8053/health    # {"estado":"ok"}
 journalctl -u hierro -f            # logs JSON
 ```
 
-## 9. Nginx y certificado TLS (Certbot)
+## 9. Nginx y certificado de origen de Cloudflare
 
-El certificado se emite primero con la configuración por defecto de Nginx, que sirve
-`/var/www/html`. Después se instala el sitio con TLS.
+El dominio pasa por el proxy de Cloudflare (nube naranja), así que el TLS se hace en dos
+tramos: del cliente a Cloudflare con el certificado de Cloudflare, y de Cloudflare al
+servidor con un **certificado de origen** que emite Cloudflare. No se usa Let's Encrypt:
+su validación llega a Cloudflare, no al servidor, y falla con el error 520.
+
+**En Cloudflare:**
+
+1. *SSL/TLS → Origin Server → Create Certificate*: clave RSA, host
+   `servicio.semanticaapi.com.co` y validez de 15 años.
+2. Copia el certificado y la clave privada. La clave solo se muestra en ese momento.
+3. *SSL/TLS → Overview*: modo **Full (strict)**.
+4. *DNS*: el registro de `servicio.semanticaapi.com.co` apunta a la IP del servidor, con
+   el proxy activado.
+
+**En el servidor**, guarda el certificado y la clave:
 
 ```bash
-sudo certbot certonly --webroot -w /var/www/html -d hierro.ejemplo.com \
-    --email tu@correo.com --agree-tos --no-eff-email
+sudo mkdir -p /etc/ssl/cloudflare
+sudo nano /etc/ssl/cloudflare/hierro.pem    # pega el certificado de origen
+sudo nano /etc/ssl/cloudflare/hierro.key    # pega la clave privada
+sudo chmod 0644 /etc/ssl/cloudflare/hierro.pem
+sudo chmod 0600 /etc/ssl/cloudflare/hierro.key
+```
 
-# Archivos de opciones TLS que referencia nginx.conf (los crea el plugin de nginx).
-sudo apt install -y python3-certbot-nginx
-ls /etc/letsencrypt/options-ssl-nginx.conf /etc/letsencrypt/ssl-dhparams.pem \
-  || sudo certbot install --nginx --cert-name hierro.ejemplo.com
+Nginx toma la IP real del cliente del header `CF-Connecting-IP`, pero solo si la
+petición viene de Cloudflare. La lista de sus rangos se genera así:
 
-sudo sed 's/hierro.ejemplo.com/TU_DOMINIO/g' deploy/nginx.conf \
-    | sudo tee /etc/nginx/sites-available/hierro >/dev/null
+```bash
+{ curl -fsS https://www.cloudflare.com/ips-v4; echo; curl -fsS https://www.cloudflare.com/ips-v6; } \
+    | awk 'NF { print "set_real_ip_from " $1 ";" }' \
+    | sudo tee /etc/nginx/cloudflare-real-ip.conf >/dev/null
+```
+
+Cloudflare cambia esos rangos muy pocas veces. Repite el comando si publica nuevos.
+
+Instala el sitio:
+```bash
+cd /opt/hierro
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/hierro
 sudo ln -sf /etc/nginx/sites-available/hierro /etc/nginx/sites-enabled/hierro
-sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
+curl -s https://servicio.semanticaapi.com.co/health    # {"estado":"ok"}
 ```
 
-La renovación es automática (`certbot.timer`). Para que Nginx tome el certificado
-renovado:
+Si el servidor aloja otros sitios, deja su configuración como está. Solo borra
+`/etc/nginx/sites-enabled/default` si nadie más lo usa.
 
-```bash
-echo -e '#!/bin/sh\nsystemctl reload nginx' \
-    | sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-nginx >/dev/null
-sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-nginx
-sudo certbot renew --dry-run
-```
+El certificado de origen dura 15 años y no se renueva. Apunta en el calendario la fecha
+en que vence.
 
 ## 10. Primera API key
 
