@@ -74,12 +74,5 @@ class RedisSeguro:
             return None
         return int(resultado[0])
 
-    async def ping(self) -> bool:
-        try:
-            return bool(await self._cliente.ping())
-        except _ERRORES as error:
-            self._registrar_fallo("ping", error)
-            return False
-
     async def cerrar(self) -> None:
         await self._cliente.aclose()

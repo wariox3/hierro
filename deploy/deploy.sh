@@ -3,7 +3,7 @@
 #
 #   sudo /opt/news-service/deploy/deploy.sh
 #
-# Pasos: git pull, dependencias, migraciones, reinicio y verificación de /ready.
+# Pasos: git pull, dependencias, migraciones, reinicio y verificación de /health.
 # Se detiene ante el primer error.
 set -euo pipefail
 
@@ -12,8 +12,8 @@ SERVICIO="${SERVICIO:-news-service}"
 RAMA="${RAMA:-main}"
 ENV_API="${ENV_API:-/etc/news-service/api.env}"
 ENV_ADMIN="${ENV_ADMIN:-/etc/news-service/admin.env}"
-READY_URL="${READY_URL:-http://127.0.0.1:8000/ready}"
-ESPERA_READY="${ESPERA_READY:-30}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8000/health}"
+ESPERA_HEALTH="${ESPERA_HEALTH:-30}"
 
 log() { printf '[deploy %(%H:%M:%S)T] %s\n' -1 "$*"; }
 
@@ -54,17 +54,17 @@ log "Aplicando migraciones"
 log "Reiniciando $SERVICIO"
 systemctl restart "$SERVICIO"
 
-log "Esperando $READY_URL (hasta ${ESPERA_READY}s)"
-for _ in $(seq 1 "$ESPERA_READY"); do
-    if curl --fail --silent --show-error --max-time 2 "$READY_URL" >/dev/null 2>&1; then
+log "Esperando $HEALTH_URL (hasta ${ESPERA_HEALTH}s)"
+for _ in $(seq 1 "$ESPERA_HEALTH"); do
+    if curl --fail --silent --show-error --max-time 2 "$HEALTH_URL" >/dev/null 2>&1; then
         log "Despliegue completado"
         exit 0
     fi
     sleep 1
 done
 
-log "ERROR: el servicio no quedó listo"
-curl --silent --max-time 2 "$READY_URL" || true
+log "ERROR: el servicio no respondió"
+curl --silent --max-time 2 "$HEALTH_URL" || true
 echo
 journalctl -u "$SERVICIO" -n 50 --no-pager || true
 exit 1

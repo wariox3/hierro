@@ -7,7 +7,7 @@ from app.core.redis_client import RedisSeguro
 from app.utilidades.gestion_api_keys import ErrorGestion, crear_api_key, rotar_api_key
 from tests.conftest import CrearCliente, Datos
 
-URL = "/v1/noticias"
+URL = "/noticias/v1/lista"
 
 
 async def test_sin_api_key_401(cliente: httpx.AsyncClient) -> None:

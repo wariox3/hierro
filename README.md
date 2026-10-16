@@ -64,25 +64,24 @@ tests/                tests de integración (PostgreSQL y Redis locales)
 
 ## Endpoints
 
-Todos van bajo `/v1` y requieren `X-API-Key`, salvo los de salud. La documentación
+Los de noticias van bajo `/noticias/v1` y requieren `X-API-Key`; `/health` no. La documentación
 OpenAPI está en `/docs`.
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/v1/lista` | Las últimas 10 noticias activas, con `contenido` HTML sanitizado. Sin parámetros |
+| GET | `/noticias/v1/lista` | Las últimas 10 noticias activas, con `contenido` HTML sanitizado. Sin parámetros |
 | GET | `/health` | Liveness, sin dependencias |
-| GET | `/ready` | Verifica PostgreSQL y Redis; responde 503 si alguno falla |
 
 Códigos de error: `401` sin key o con key inválida, `403` API key inactiva y `429`
 límite excedido (incluye `Retry-After`).
 
 **Paginación.** El estándar para los listados es la paginación por cursor de
-`app/utilidades/paginacion.py` (`limit`, `cursor` y `siguiente_cursor`). `/v1/lista` es
+`app/utilidades/paginacion.py` (`limit`, `cursor` y `siguiente_cursor`). `/noticias/v1/lista` es
 la excepción: siempre devuelve las 10 noticias más recientes, ordenadas por
 `fecha_publicacion` descendente, sin paginación ni filtros.
 
 ```bash
-curl -H "X-API-Key: $KEY" "https://noticias.ejemplo.com/v1/lista"
+curl -H "X-API-Key: $KEY" "https://noticias.ejemplo.com/noticias/v1/lista"
 ```
 
 ## Desarrollo local
@@ -104,8 +103,8 @@ psql "postgresql://USUARIO@localhost/bdhierro" -f scripts/seed.sql   # datos de 
 `seed.sql` crea dos API keys fijas, **solo para desarrollo**:
 
 ```bash
-curl -H "X-API-Key: nk_desarrollo_web_0000000000000000000000000000" localhost:8000/v1/lista
-curl -H "X-API-Key: nk_desarrollo_movil_00000000000000000000000000" localhost:8000/v1/lista
+curl -H "X-API-Key: nk_desarrollo_web_0000000000000000000000000000" localhost:8000/noticias/v1/lista
+curl -H "X-API-Key: nk_desarrollo_movil_00000000000000000000000000" localhost:8000/noticias/v1/lista
 ```
 
 ### Verificación
@@ -227,7 +226,7 @@ sudo /opt/news-service/deploy/deploy.sh
 ```
 
 El script hace `git pull`, instala `requirements.txt`, ejecuta `alembic upgrade head`,
-reinicia el servicio y espera a que `/ready` responda. Ante el primer error se detiene
+reinicia el servicio y espera a que `/health` responda. Ante el primer error se detiene
 y muestra los últimos logs. Es idempotente: ejecutarlo dos veces seguidas no cambia nada.
 
 Si la migración crea tablas nuevas, ejecuta después `scripts/roles.sql` para otorgar

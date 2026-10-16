@@ -1,16 +1,9 @@
-"""Respuestas de /health y /ready."""
+"""Respuesta de /health."""
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class EstadoSalud(BaseModel):
     estado: Literal["ok"]
-
-
-class EstadoPreparacion(BaseModel):
-    estado: Literal["ok", "no_disponible"]
-    componentes: dict[str, Literal["ok", "error"]] = Field(
-        examples=[{"postgresql": "ok", "redis": "ok"}]
-    )

@@ -28,8 +28,8 @@ def test_sanitizar_html(entrada: str, esperado: str) -> None:
     assert sanitizar_html(entrada) == esperado
 
 
-async def test_detalle_devuelve_html_sanitizado(cliente: httpx.AsyncClient, datos: Datos) -> None:
+async def test_listado_devuelve_html_sanitizado(cliente: httpx.AsyncClient, datos: Datos) -> None:
     _, key = await datos.api_key()
-    noticia = await datos.noticia(contenido='<p onclick="x()">Hola</p><script>alert(1)</script>')
-    respuesta = await cliente.get(f"/v1/noticias/{noticia.id}", headers={"X-API-Key": key})
-    assert respuesta.json()["contenido"] == "<p>Hola</p>"
+    await datos.noticia(contenido='<p onclick="x()">Hola</p><script>alert(1)</script>')
+    respuesta = await cliente.get("/noticias/v1/lista", headers={"X-API-Key": key})
+    assert respuesta.json()["datos"][0]["contenido"] == "<p>Hola</p>"

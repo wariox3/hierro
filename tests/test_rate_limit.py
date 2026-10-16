@@ -1,6 +1,6 @@
 from tests.conftest import CrearCliente, Datos
 
-URL = "/v1/noticias"
+URL = "/noticias/v1/lista"
 
 
 async def test_excede_el_limite_429(crear_cliente: CrearCliente, datos: Datos) -> None:

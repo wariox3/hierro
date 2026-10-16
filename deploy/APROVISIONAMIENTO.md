@@ -120,7 +120,7 @@ psql "postgresql://doadmin@HOST:25060/BASE?sslmode=require" \
 sudo cp deploy/news-service.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now news-service
-curl -s http://127.0.0.1:8000/ready     # {"estado":"ok",...}
+curl -s http://127.0.0.1:8000/health    # {"estado":"ok"}
 journalctl -u news-service -f            # logs JSON
 ```
 

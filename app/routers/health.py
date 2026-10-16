@@ -1,17 +1,8 @@
 """Endpoints de salud del servicio."""
 
-import asyncio
-import logging
-
 from fastapi import APIRouter, Response
-from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.core.recursos import RecursosApp
-from app.schemas import EstadoPreparacion, EstadoSalud
-
-logger = logging.getLogger("app.salud")
+from app.schemas import EstadoSalud
 
 router = APIRouter(tags=["salud"])
 
