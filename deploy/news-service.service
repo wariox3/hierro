@@ -1,0 +1,52 @@
+# Unidad systemd del servicio de noticias.
+# Instalar en /etc/systemd/system/news-service.service (ver deploy/APROVISIONAMIENTO.md).
+
+[Unit]
+Description=News Service (API REST de noticias)
+After=network-online.target redis-server.service
+Wants=network-online.target redis-server.service
+
+[Service]
+Type=exec
+User=news-service
+Group=news-service
+WorkingDirectory=/opt/news-service
+EnvironmentFile=/etc/news-service/api.env
+Environment=PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/news-service/.venv/bin/uvicorn app.main:create_app --factory \
+    --host 127.0.0.1 --port 8000 \
+    --workers 4 \
+    --proxy-headers --forwarded-allow-ips=127.0.0.1 \
+    --log-config /opt/news-service/deploy/uvicorn-logging.json \
+    --no-access-log --no-server-header \
+    --timeout-graceful-shutdown 20
+Restart=always
+RestartSec=3
+TimeoutStopSec=30
+KillMode=mixed
+
+# Endurecimiento: el usuario no tiene privilegios y el código es de solo lectura.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
