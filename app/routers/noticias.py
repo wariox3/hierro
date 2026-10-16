@@ -16,7 +16,7 @@ from app.models import Noticia as NoticiaModelo
 from app.schemas import ListaNoticias, Noticia
 from app.utilidades.sanitizacion import sanitizar_html
 
-router = APIRouter(prefix="/v1", tags=["noticias"], responses=RESPUESTAS_ERROR_AUTH)
+router = APIRouter(prefix="/noticias/v1", tags=["noticias"], responses=RESPUESTAS_ERROR_AUTH)
 
 
 @router.get(

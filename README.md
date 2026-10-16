@@ -98,7 +98,7 @@ cp .env.example .env        # completa DATABASE_URL y pon DATABASE_SSL=disable
 .venv/bin/alembic upgrade head                                     # crea el esquema
 psql "postgresql://USUARIO@localhost/bdhierro" -f scripts/seed.sql   # datos de ejemplo
 
-.venv/bin/uvicorn app.main:create_app --factory --reload
+.venv/bin/uvicorn app.main:app --reload
 ```
 
 `seed.sql` crea dos API keys fijas, **solo para desarrollo**:

@@ -1,10 +1,13 @@
 """Construcción de la aplicación FastAPI.
 
-Uvicorn la arranca con `app.main:create_app --factory`.
+Uvicorn la arranca con `app.main:app`. La variable `app` se crea al pedirla por primera
+vez, no al importar el módulo: así importar `create_app` (p. ej. desde los tests) no lee
+la configuración.
 """
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import cache
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -68,3 +71,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(health.router)
     app.include_router(noticias.router)
     return app
+
+
+@cache
+def _app_por_defecto() -> FastAPI:
+    return create_app()
+
+
+def __getattr__(nombre: str) -> FastAPI:
+    if nombre == "app":
+        return _app_por_defecto()
+    raise AttributeError(f"module {__name__!r} has no attribute {nombre!r}")

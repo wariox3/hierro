@@ -13,7 +13,7 @@ Group=news-service
 WorkingDirectory=/opt/news-service
 EnvironmentFile=/etc/news-service/api.env
 Environment=PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/news-service/.venv/bin/uvicorn app.main:create_app --factory \
+ExecStart=/opt/news-service/.venv/bin/uvicorn app.main:app \
     --host 127.0.0.1 --port 8000 \
     --workers 4 \
     --proxy-headers --forwarded-allow-ips=127.0.0.1 \
