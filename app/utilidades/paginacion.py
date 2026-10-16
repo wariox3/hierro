@@ -2,7 +2,7 @@
 
 Todo listado se ordena por `(fecha, id)` descendente y se pagina por keyset:
   - la ruta recibe `limit` y `cursor` con la dependencia `ParametrosPaginacion`;
-  - el repositorio filtra y ordena con `aplicar_pagina` (pide `limite + 1` filas);
+  - la consulta se filtra y ordena con `aplicar_pagina` (pide `limite + 1` filas);
   - la ruta corta el resultado con `cortar_pagina` y responde un `Pagina[T]`.
 
 El cursor es opaco: base64url de `{"f": fecha, "i": id}` de la última fila de la página.
@@ -13,7 +13,7 @@ import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends, Query
 from sqlalchemy import DateTime, Integer, Select, literal, tuple_
@@ -84,13 +84,13 @@ RESPUESTA_CURSOR_INVALIDO: dict[int | str, dict[str, object]] = {
 }
 
 
-def aplicar_pagina(
-    consulta: Select[Any],
+def aplicar_pagina[*Ts](
+    consulta: Select[*Ts],
     *,
     fecha: InstrumentedAttribute[datetime],
     id_: InstrumentedAttribute[int],
     paginacion: Paginacion,
-) -> Select[Any]:
+) -> Select[*Ts]:
     """Ordena por `(fecha, id)` descendente, salta hasta el cursor y pide `limite + 1` filas."""
     if paginacion.despues_de is not None:
         fecha_cursor, id_cursor = paginacion.despues_de

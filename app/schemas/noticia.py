@@ -4,8 +4,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.schemas.paginacion import Pagina
-
 
 class Noticia(BaseModel):
     id: int
@@ -16,5 +14,7 @@ class Noticia(BaseModel):
     fecha_actualizacion: datetime
 
 
-class ListaNoticias(Pagina[Noticia]):
-    pass
+class ListaNoticias(BaseModel):
+    """Listado sin paginación: no lleva `siguiente_cursor`."""
+
+    datos: list[Noticia]

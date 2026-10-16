@@ -20,12 +20,10 @@ Apps cliente ──HTTPS──▶ Nginx (TLS, gzip, límite por IP)
 - **Autenticación:** cada cliente usa una API key (tabla `api_key`), que se envía en el
   header `X-API-Key`. En la base solo se guardan su SHA-256 y un prefijo para identificarla. El
   resultado de la validación se cachea en Redis.
-- **Visibilidad:** una noticia es visible solo si se cumplen las dos condiciones. Es
-  igual para todas las API keys:
-  - `estado_inactivo = false`;
-  - `fecha_publicacion <= now()`.
-- **Caché:** los listados y el detalle se guardan en Redis (TTL de 120 s por defecto),
-  con claves que incluyen el recurso y los parámetros; todas las keys comparten la caché. Las respuestas llevan `ETag`
+- **Visibilidad:** una noticia es visible si `estado_inactivo = false`. Es igual para
+  todas las API keys. Las noticias con `fecha_publicacion` futura también se muestran.
+- **Caché:** los listados se guardan en Redis (TTL de 120 s por defecto),
+  con claves que incluyen el recurso y los parámetros, si los hay; todas las keys comparten la caché. Las respuestas llevan `ETag`
   y `Cache-Control`, y un `If-None-Match` que coincide recibe `304`.
 - **Degradación:** si Redis cae, la API sigue funcionando contra PostgreSQL, sin caché
   ni rate limit, y deja el error en el log.
@@ -54,7 +52,6 @@ app/                  código de la API
   models/             modelos SQLAlchemy 2.x, uno por tabla (la Base está en core/db.py)
   schemas/            esquemas Pydantic de las respuestas, por dominio (noticia, errores, salud)
   routers/            health, noticias
-  repositorio.py      consultas y regla de visibilidad
   utilidades/         utilidades específicas: gestión de API keys, paginación y sanitización
     gestion_api_keys.py alta, rotación y listado de API keys (usa scripts/crear_api_key.py)
     paginacion.py     paginación por cursor común a todos los listados
@@ -72,28 +69,20 @@ OpenAPI está en `/docs`.
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| GET | `/v1/noticias` | Listado con `contenido` HTML sanitizado. Parámetros: `limit` (1–50, por defecto 20), `cursor` y `updated_since` (ISO 8601 con zona horaria) |
-| GET | `/v1/noticias/{id}` | Una noticia. Responde 404 si no existe o no es visible |
+| GET | `/v1/lista` | Las últimas 10 noticias activas, con `contenido` HTML sanitizado. Sin parámetros |
 | GET | `/health` | Liveness, sin dependencias |
 | GET | `/ready` | Verifica PostgreSQL y Redis; responde 503 si alguno falla |
 
-Códigos de error: `401` sin key o con key inválida, `403` API key inactiva, `400` cursor
-inválido, `422` parámetros inválidos y `429` límite excedido (incluye `Retry-After`).
+Códigos de error: `401` sin key o con key inválida, `403` API key inactiva y `429`
+límite excedido (incluye `Retry-After`).
 
-**Paginación.** La respuesta trae `siguiente_cursor`; para la página siguiente, envíalo
-en `cursor` con los mismos filtros. Cuando vale `null`, no hay más páginas.
-
-**Sincronización con `updated_since`.** Devuelve las noticias visibles que se crearon,
-modificaron o publicaron desde esa fecha. Dos detalles:
-
-- Las noticias despublicadas no aparecen. Para detectar bajas, el cliente debe volver
-  a pedir el detalle (recibirá 404) o recargar todo cada cierto tiempo.
-- Resta un margen de unos minutos al instante de tu última sincronización. Una
-  transacción larga del editor puede confirmar con una `fecha_actualizacion` anterior a
-  su commit, y la caché agrega hasta `CACHE_TTL` segundos de demora.
+**Paginación.** El estándar para los listados es la paginación por cursor de
+`app/utilidades/paginacion.py` (`limit`, `cursor` y `siguiente_cursor`). `/v1/lista` es
+la excepción: siempre devuelve las 10 noticias más recientes, ordenadas por
+`fecha_publicacion` descendente, sin paginación ni filtros.
 
 ```bash
-curl -H "X-API-Key: $KEY" "https://noticias.ejemplo.com/v1/noticias?limit=10"
+curl -H "X-API-Key: $KEY" "https://noticias.ejemplo.com/v1/lista"
 ```
 
 ## Desarrollo local
@@ -115,8 +104,8 @@ psql "postgresql://USUARIO@localhost/bdhierro" -f scripts/seed.sql   # datos de 
 `seed.sql` crea dos API keys fijas, **solo para desarrollo**:
 
 ```bash
-curl -H "X-API-Key: nk_desarrollo_web_0000000000000000000000000000" localhost:8000/v1/noticias
-curl -H "X-API-Key: nk_desarrollo_movil_00000000000000000000000000" localhost:8000/v1/noticias
+curl -H "X-API-Key: nk_desarrollo_web_0000000000000000000000000000" localhost:8000/v1/lista
+curl -H "X-API-Key: nk_desarrollo_movil_00000000000000000000000000" localhost:8000/v1/lista
 ```
 
 ### Verificación
@@ -155,7 +144,7 @@ Están documentadas en [`.env.example`](.env.example). Las principales:
 | `ADMIN_DATABASE_URL` | `DATABASE_URL` | Rol propietario: migraciones y `crear_api_key.py` |
 | `DATABASE_SSL` | `require` | `disable`, `require` o `verify-full` (con `DATABASE_SSL_ROOT_CERT`) |
 | `REDIS_URL` | `redis://localhost:6379/0` | Caché, autenticación y rate limit |
-| `CACHE_TTL` | `120` | Segundos en caché de listados y detalle |
+| `CACHE_TTL` | `120` | Segundos en caché de los listados |
 | `HTTP_CACHE_MAX_AGE` | `60` | `max-age` de `Cache-Control` |
 | `AUTH_CACHE_TTL` | `300` | Segundos en caché de la validación de una key |
 | `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW` | `120` / `60` | Solicitudes por ventana (s) y por API key |
