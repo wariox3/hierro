@@ -106,6 +106,7 @@ def settings(config_tests: ConfigTests, esquema: None) -> Settings:
         database_url=config_tests.test_database_url,
         database_ssl="disable",
         redis_url=config_tests.test_redis_url,
+        redis_key_prefix="hierro:test",
         rate_limit_requests=1000,
     )
 

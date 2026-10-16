@@ -1,19 +1,21 @@
-# news-service
+# hierro
 
-Servicio REST de **solo lectura** que provee noticias a las aplicaciones del ecosistema.
-Las noticias se cargan **manualmente por SQL**. La API no tiene endpoints de escritura.
+Servicios REST globales de **Semántica Digital** para las aplicaciones del ecosistema.
+
+Hoy incluye el servicio de **noticias**, de solo lectura: las noticias se cargan
+**manualmente por SQL** y la API no tiene endpoints de escritura.
 
 ## Arquitectura
 
 ```
 Apps cliente ──HTTPS──▶ Nginx (TLS, gzip, límite por IP)
-                          │ 127.0.0.1:8000
+                          │ 127.0.0.1:8053
                           ▼
                  Uvicorn (4 workers, systemd) ── FastAPI
                           │                 │
            SQLAlchemy async + asyncpg    redis.asyncio
                           │                 │
-       PostgreSQL administrado (DO)    Redis local
+       PostgreSQL administrado (DO)    Redis administrado (TLS)
        conexión directa, TLS           caché, auth y rate limit
 ```
 
@@ -38,7 +40,7 @@ Apps cliente ──HTTPS──▶ Nginx (TLS, gzip, límite por IP)
 ```
 app/                  código de la API
   main.py             create_app(): lifespan, middlewares, routers
-  core/               núcleo transversal, sin lógica de noticias
+  core/               núcleo transversal, sin lógica de ningún servicio
     config.py         variables de entorno (pydantic-settings)
     db.py             engine de PostgreSQL (asyncpg, TLS, pool)
     redis_client.py   cliente Redis tolerante a fallos
@@ -81,7 +83,7 @@ la excepción: siempre devuelve las 10 noticias más recientes, ordenadas por
 `fecha_publicacion` descendente, sin paginación ni filtros.
 
 ```bash
-curl -H "X-API-Key: $KEY" "https://noticias.ejemplo.com/noticias/v1/lista"
+curl -H "X-API-Key: $KEY" "https://hierro.ejemplo.com/noticias/v1/lista"
 ```
 
 ## Desarrollo local
@@ -97,14 +99,14 @@ cp .env.example .env        # completa DATABASE_URL y pon DATABASE_SSL=disable
 .venv/bin/alembic upgrade head                                     # crea el esquema
 psql "postgresql://USUARIO@localhost/bdhierro" -f scripts/seed.sql   # datos de ejemplo
 
-.venv/bin/uvicorn app.main:app --reload
+.venv/bin/uvicorn app.main:app --reload --port 8053
 ```
 
 `seed.sql` crea dos API keys fijas, **solo para desarrollo**:
 
 ```bash
-curl -H "X-API-Key: nk_desarrollo_web_0000000000000000000000000000" localhost:8000/noticias/v1/lista
-curl -H "X-API-Key: nk_desarrollo_movil_00000000000000000000000000" localhost:8000/noticias/v1/lista
+curl -H "X-API-Key: nk_desarrollo_web_0000000000000000000000000000" localhost:8053/noticias/v1/lista
+curl -H "X-API-Key: nk_desarrollo_movil_00000000000000000000000000" localhost:8053/noticias/v1/lista
 ```
 
 ### Verificación
@@ -121,7 +123,8 @@ nombre más el sufijo `_test` (por ejemplo `bdhierro_test`). Si no existe, la cr
 que el usuario necesita permiso `CREATEDB`. Al empezar cada corrida **borran su esquema**
 y ejecutan `alembic upgrade head`, con lo que también comprueban que la migración funciona
 sobre una base vacía. La base de `DATABASE_URL` no se toca. Redis usa `TEST_REDIS_URL`
-(por defecto la base 15), que se vacía en cada test.
+(por defecto la base 15 del Redis local), que se vacía en cada test: nunca la apuntes al
+Redis administrado compartido.
 
 ### Dependencias
 
@@ -142,7 +145,8 @@ Están documentadas en [`.env.example`](.env.example). Las principales:
 | `DATABASE_URL` | — | Conexión de la API (rol `api_noticias`), `postgresql+asyncpg://…` |
 | `ADMIN_DATABASE_URL` | `DATABASE_URL` | Rol propietario: migraciones y `crear_api_key.py` |
 | `DATABASE_SSL` | `require` | `disable`, `require` o `verify-full` (con `DATABASE_SSL_ROOT_CERT`) |
-| `REDIS_URL` | `redis://localhost:6379/0` | Caché, autenticación y rate limit |
+| `REDIS_URL` | `redis://localhost:6379/0` | Caché, autenticación y rate limit. Lleva toda la conexión; en producción, `rediss://…` del servicio administrado, con el TLS como parámetros de la URL |
+| `REDIS_KEY_PREFIX` | — (obligatoria) | Prefijo de todas las claves en Redis, distinto por entorno: `hierro:dev`, `hierro:produccion`. El Redis administrado es compartido |
 | `CACHE_TTL` | `120` | Segundos en caché de los listados |
 | `HTTP_CACHE_MAX_AGE` | `60` | `max-age` de `Cache-Control` |
 | `AUTH_CACHE_TTL` | `300` | Segundos en caché de la validación de una key |
@@ -175,7 +179,7 @@ migración que cree tablas nuevas (ver `deploy/APROVISIONAMIENTO.md`).
 ```
 
 En producción, carga antes las variables:
-`sudo bash -c 'set -a; . /etc/news-service/api.env; . /etc/news-service/admin.env; set +a; .venv/bin/python scripts/crear_api_key.py listar'`.
+`sudo bash -c 'set -a; . ./.env; . ./.env.admin; set +a; .venv/bin/python scripts/crear_api_key.py listar'`, desde `/opt/hierro`.
 
 Para desactivar una key por SQL: `UPDATE api_key SET estado_inactivo = true
 WHERE nombre = 'web';`. El cambio rige como máximo en `AUTH_CACHE_TTL` segundos. Para
@@ -216,13 +220,13 @@ caché.
 
 El servidor se prepara una sola vez siguiendo
 [`deploy/APROVISIONAMIENTO.md`](deploy/APROVISIONAMIENTO.md) (Ubuntu 24.04: usuario del
-servicio, Redis, Nginx, Certbot y systemd).
+servicio, Redis administrado, Nginx, Certbot y systemd).
 
 Cada despliegue es manual:
 
 ```bash
 ssh servidor
-sudo /opt/news-service/deploy/deploy.sh
+sudo /opt/hierro/deploy/deploy.sh
 ```
 
 El script hace `git pull`, instala `requirements.txt`, ejecuta `alembic upgrade head`,
@@ -233,7 +237,7 @@ Si la migración crea tablas nuevas, ejecuta después `scripts/roles.sql` para o
 los permisos.
 
 ```bash
-journalctl -u news-service -f              # logs JSON
-journalctl -u news-service -o cat | jq .   # legibles
-systemctl status news-service
+journalctl -u hierro -f              # logs JSON
+journalctl -u hierro -o cat | jq .   # legibles
+systemctl status hierro
 ```

@@ -39,7 +39,7 @@ class _EntradaCache(BaseModel):
 
 
 def clave_cache_auth(hash_key: str) -> str:
-    return f"news:v1:auth:{hash_key}"
+    return f"v1:auth:{hash_key}"
 
 
 def _leer_cache(valor: bytes | None) -> _EntradaCache | None:
@@ -104,9 +104,7 @@ async def limitar_tasa(
     limite = recursos.settings.rate_limit_requests
     ventana = recursos.settings.rate_limit_window
     ahora = int(time.time())
-    cuenta = await recursos.redis.incrementar(
-        f"news:v1:rl:{api_key.id}:{ahora // ventana}", ttl=ventana
-    )
+    cuenta = await recursos.redis.incrementar(f"v1:rl:{api_key.id}:{ahora // ventana}", ttl=ventana)
     if cuenta is not None and cuenta > limite:
         raise ErrorAPI(
             429,

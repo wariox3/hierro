@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Despliegue manual e idempotente del servicio de noticias.
+# Despliegue manual e idempotente de hierro (servicios de Semántica Digital).
 #
-#   sudo /opt/news-service/deploy/deploy.sh
+#   sudo /opt/hierro/deploy/deploy.sh
 #
 # Pasos: git pull, dependencias, migraciones, reinicio y verificación de /health.
 # Se detiene ante el primer error.
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/news-service}"
-SERVICIO="${SERVICIO:-news-service}"
+APP_DIR="${APP_DIR:-/opt/hierro}"
+SERVICIO="${SERVICIO:-hierro}"
 RAMA="${RAMA:-main}"
-ENV_API="${ENV_API:-/etc/news-service/api.env}"
-ENV_ADMIN="${ENV_ADMIN:-/etc/news-service/admin.env}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8000/health}"
+ENV_API="${ENV_API:-/opt/hierro/.env}"
+ENV_ADMIN="${ENV_ADMIN:-/opt/hierro/.env.admin}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8053/health}"
 ESPERA_HEALTH="${ESPERA_HEALTH:-30}"
 
 log() { printf '[deploy %(%H:%M:%S)T] %s\n' -1 "$*"; }

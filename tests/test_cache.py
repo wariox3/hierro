@@ -7,13 +7,14 @@ import pytest
 from redis.asyncio import Redis
 
 from app.core.cache import etag_coincide
+from app.core.config import Settings
 from tests.conftest import CrearCliente, Datos
 
 URL = "/noticias/v1/lista"
 
 
 async def test_listado_se_cachea_hasta_el_ttl(
-    cliente: httpx.AsyncClient, datos: Datos, redis_tests: Redis
+    cliente: httpx.AsyncClient, datos: Datos, redis_tests: Redis, settings: Settings
 ) -> None:
     _, key = await datos.api_key()
     primera = await datos.noticia("Primera")
@@ -25,7 +26,10 @@ async def test_listado_se_cachea_hasta_el_ttl(
     assert cacheada.content == antes.content
     assert [n["id"] for n in cacheada.json()["datos"]] == [primera.id]
 
-    claves = [clave.decode() async for clave in redis_tests.scan_iter("news:v1:noticias:*")]
+    claves = [
+        clave.decode()
+        async for clave in redis_tests.scan_iter(f"{settings.redis_key_prefix}:v1:noticias:*")
+    ]
     assert len(claves) == 1
     assert 0 < await redis_tests.ttl(claves[0]) <= 120
 
@@ -35,7 +39,7 @@ async def test_listado_se_cachea_hasta_el_ttl(
 
 
 async def test_una_sola_entrada_de_cache_para_todas_las_keys(
-    cliente: httpx.AsyncClient, datos: Datos, redis_tests: Redis
+    cliente: httpx.AsyncClient, datos: Datos, redis_tests: Redis, settings: Settings
 ) -> None:
     _, key_a = await datos.api_key("a")
     _, key_b = await datos.api_key("b")
@@ -50,7 +54,9 @@ async def test_una_sola_entrada_de_cache_para_todas_las_keys(
     # Todas las keys ven las mismas noticias: comparten la entrada de caché.
     assert a.content == b.content == a_parametros.content
     assert a.headers["etag"] == b.headers["etag"]
-    claves = {clave async for clave in redis_tests.scan_iter("news:v1:noticias:*")}
+    claves = {
+        clave async for clave in redis_tests.scan_iter(f"{settings.redis_key_prefix}:v1:noticias:*")
+    }
     assert len(claves) == 1
 
 
@@ -119,3 +125,16 @@ async def test_sin_redis_la_api_funciona_y_registra_el_error(
     avisos = [r for r in caplog.records if r.getMessage() == "redis_no_disponible"]
     assert avisos
     assert avisos[0].levelno == logging.WARNING
+
+
+async def test_todas_las_claves_llevan_el_prefijo_del_entorno(
+    cliente: httpx.AsyncClient, datos: Datos, redis_tests: Redis, settings: Settings
+) -> None:
+    _, key = await datos.api_key()
+    await datos.noticia()
+    assert (await cliente.get(URL, headers={"X-API-Key": key})).status_code == 200
+
+    # Caché del listado, validación de la key y contador del rate limit.
+    claves = sorted([clave.decode() async for clave in redis_tests.scan_iter("*")])
+    assert len(claves) == 3
+    assert all(clave.startswith("hierro:test:v1:") for clave in claves), claves

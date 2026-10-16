@@ -1,23 +1,23 @@
-# Unidad systemd del servicio de noticias.
-# Instalar en /etc/systemd/system/news-service.service (ver deploy/APROVISIONAMIENTO.md).
+# Unidad systemd de hierro (servicios de Semántica Digital).
+# Instalar en /etc/systemd/system/hierro.service (ver deploy/APROVISIONAMIENTO.md).
 
 [Unit]
-Description=News Service (API REST de noticias)
-After=network-online.target redis-server.service
-Wants=network-online.target redis-server.service
+Description=Hierro (servicios REST de Semántica Digital)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=exec
-User=news-service
-Group=news-service
-WorkingDirectory=/opt/news-service
-EnvironmentFile=/etc/news-service/api.env
+User=hierro
+Group=hierro
+WorkingDirectory=/opt/hierro
+EnvironmentFile=/opt/hierro/.env
 Environment=PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
-ExecStart=/opt/news-service/.venv/bin/uvicorn app.main:app \
-    --host 127.0.0.1 --port 8000 \
+ExecStart=/opt/hierro/.venv/bin/uvicorn app.main:app \
+    --host 127.0.0.1 --port 8053 \
     --workers 4 \
     --proxy-headers --forwarded-allow-ips=127.0.0.1 \
-    --log-config /opt/news-service/deploy/uvicorn-logging.json \
+    --log-config /opt/hierro/deploy/uvicorn-logging.json \
     --no-access-log --no-server-header \
     --timeout-graceful-shutdown 20
 Restart=always

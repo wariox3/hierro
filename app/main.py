@@ -31,7 +31,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine = crear_engine(settings)
-        redis = RedisSeguro.desde_url(settings.redis_url, settings.redis_timeout)
+        redis = RedisSeguro.desde_url(
+            settings.redis_url, settings.redis_timeout, settings.redis_key_prefix
+        )
         app.state.recursos = Recursos(
             settings=settings,
             engine=engine,
@@ -45,8 +47,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await engine.dispose()
 
     app = FastAPI(
-        title="News Service",
-        description="API REST de solo lectura que provee noticias a las aplicaciones cliente.",
+        title="Hierro",
+        description="Servicios REST globales de Semántica Digital para las aplicaciones cliente.",
         version=__version__,
         lifespan=lifespan,
         docs_url="/docs" if settings.docs_enabled else None,

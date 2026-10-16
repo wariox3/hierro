@@ -1,7 +1,7 @@
 [project]
-name = "news-service"
+name = "hierro"
 version = "0.1.0"
-description = "Servicio REST de solo lectura que provee noticias a las aplicaciones del ecosistema."
+description = "Servicios REST globales de Semántica Digital para las aplicaciones del ecosistema."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 

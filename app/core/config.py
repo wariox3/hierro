@@ -1,5 +1,6 @@
 """Configuración del servicio, leída de variables de entorno (y de `.env` en local)."""
 
+import re
 from functools import lru_cache
 from typing import Annotated, Literal
 
@@ -7,6 +8,9 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _ESQUEMA_URL = "postgresql+asyncpg://"
+_ESQUEMAS_REDIS = ("redis://", "rediss://")
+# Segmentos separados por `:`, p. ej. `hierro:dev` o `hierro:produccion`.
+_PREFIJO_REDIS_VALIDO = re.compile(r"^[A-Za-z0-9_-]+(:[A-Za-z0-9_-]+)*$")
 
 
 class Settings(BaseSettings):
@@ -26,7 +30,10 @@ class Settings(BaseSettings):
     database_statement_timeout_ms: int = Field(default=5000, ge=0)
 
     # Redis
+    # Toda la conexión va en la URL, también el TLS de un Redis administrado (`rediss://`).
     redis_url: str = "redis://localhost:6379/0"
+    # Obligatorio: el Redis administrado es compartido y cada entorno usa su prefijo.
+    redis_key_prefix: str
     redis_timeout: float = Field(default=0.5, gt=0)
 
     # Caché
@@ -52,6 +59,20 @@ class Settings(BaseSettings):
             raise ValueError(f"debe empezar por {_ESQUEMA_URL}")
         if "sslmode=" in valor:
             raise ValueError("no incluyas sslmode en la URL; usa DATABASE_SSL")
+        return valor
+
+    @field_validator("redis_url")
+    @classmethod
+    def _validar_url_redis(cls, valor: str) -> str:
+        if not valor.startswith(_ESQUEMAS_REDIS):
+            raise ValueError("debe empezar por redis:// o rediss://")
+        return valor
+
+    @field_validator("redis_key_prefix")
+    @classmethod
+    def _validar_prefijo_redis(cls, valor: str) -> str:
+        if not _PREFIJO_REDIS_VALIDO.match(valor):
+            raise ValueError("usa segmentos separados por ':', p. ej. hierro:dev (sin ':' final)")
         return valor
 
     @field_validator("cors_origins", mode="before")

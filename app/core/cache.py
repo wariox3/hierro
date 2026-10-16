@@ -1,6 +1,6 @@
 """Caché de respuestas en Redis y validación HTTP con ETag.
 
-Las noticias se insertan por SQL y la API no se entera: la caché expira por TTL.
+Los datos se cargan por SQL y la API no se entera: la caché expira por TTL.
 """
 
 import hashlib
@@ -19,11 +19,11 @@ RESPUESTA_NO_MODIFICADO: dict[int | str, dict[str, object]] = {
 def clave_cache(recurso: str, parametros: Mapping[str, object]) -> str:
     """Clave con el recurso y un hash de los parámetros normalizados.
 
-    No incluye la API key: todas las keys ven las mismas noticias, así que comparten caché.
+    No incluye la API key: todas las keys ven los mismos datos, así que comparten caché.
     """
     normalizados = json.dumps(parametros, sort_keys=True, default=str, separators=(",", ":"))
     huella = hashlib.sha256(normalizados.encode()).hexdigest()[:32]
-    return f"news:v1:{recurso}:{huella}"
+    return f"v1:{recurso}:{huella}"
 
 
 async def cuerpo_cacheado(

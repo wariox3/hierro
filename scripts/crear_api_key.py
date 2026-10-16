@@ -41,7 +41,9 @@ async def _ejecutar(argumentos: argparse.Namespace) -> int:
     settings = Settings()
     engine = crear_engine(settings, settings.url_admin)
     sesiones = async_sessionmaker(engine, expire_on_commit=False)
-    redis = RedisSeguro.desde_url(settings.redis_url, settings.redis_timeout)
+    redis = RedisSeguro.desde_url(
+        settings.redis_url, settings.redis_timeout, settings.redis_key_prefix
+    )
     try:
         if argumentos.comando == "crear":
             api_key, key = await crear_api_key(sesiones, argumentos.nombre)

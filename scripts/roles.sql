@@ -1,4 +1,4 @@
--- Roles de base de datos del servicio de noticias.
+-- Roles de base de datos de hierro (servicios de Semántica Digital).
 --
 -- Ejecutar con el usuario administrador del servicio administrado (doadmin en
 -- DigitalOcean), conectado a la base del servicio y en conexión directa (no al pool):

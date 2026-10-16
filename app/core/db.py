@@ -29,7 +29,7 @@ def argumentos_conexion(settings: Settings) -> dict[str, Any]:
     return {
         "ssl": tls,
         "server_settings": {
-            "application_name": "news-service",
+            "application_name": "hierro",
             "statement_timeout": str(settings.database_statement_timeout_ms),
         },
     }

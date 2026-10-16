@@ -64,7 +64,9 @@ async def test_crear_y_rotar_api_key(
     cliente: httpx.AsyncClient, db: AsyncEngine, settings: Settings
 ) -> None:
     sesiones = async_sessionmaker(db, expire_on_commit=False)
-    redis = RedisSeguro.desde_url(settings.redis_url, settings.redis_timeout)
+    redis = RedisSeguro.desde_url(
+        settings.redis_url, settings.redis_timeout, settings.redis_key_prefix
+    )
     try:
         api_key, key = await crear_api_key(sesiones, "cliente-nuevo")
         assert key.startswith("nk_")
